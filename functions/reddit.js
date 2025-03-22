@@ -4,27 +4,16 @@ const NodeCache = require('node-cache');
 // Create a cache with a 1-hour TTL
 const cache = new NodeCache({ stdTTL: 3600 });
 
-// Use Reddit's public JSON API instead of the official API
-// This is more permissive and doesn't require authentication
-const REDDIT_BASE_URL = 'https://www.reddit.com';
-
-// Subreddits to search
-const PROGRAMMING_SUBREDDITS = [
-  'webdev',
-  'reactjs',
-  'nextjs',
-  'javascript',
-  'programming',
-  'vercel',
-  'netlify',
-  'jamstack'
-];
+// Use Reddit's public non-API endpoint which is more permissive
+// This endpoint is less likely to be rate-limited or blocked
+const REDDIT_SEARCH_URL = 'https://www.reddit.com/search/.json';
 
 exports.handler = async function(event, context) {
   try {
     // Check cache first
     const cachedData = cache.get('redditComments');
     if (cachedData) {
+      console.log("Returning cached data with", cachedData.length, "items");
       return {
         statusCode: 200,
         headers: {
@@ -38,61 +27,53 @@ exports.handler = async function(event, context) {
 
     console.log("Cache miss - fetching fresh data");
     
-    // Try to search each programming subreddit
-    const allPosts = [];
+    // Define search parameters
+    const searchParams = new URLSearchParams({
+      q: 'title:vercel AND title:netlify OR "vercel vs netlify" OR "netlify vs vercel"',
+      t: 'year',
+      sort: 'relevance',
+      limit: '50'
+    });
     
-    for (const subreddit of PROGRAMMING_SUBREDDITS) {
-      try {
-        // Use the public JSON API
-        const response = await axios.get(`${REDDIT_BASE_URL}/r/${subreddit}/search.json`, {
-          params: {
-            q: "vercel netlify",
-            restrict_sr: true,
-            sort: "relevance",
-            t: "year",
-            limit: 15
-          },
-          headers: {
-            // Use a valid user agent
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko)'
-          },
-          timeout: 5000 // 5 seconds timeout
-        });
-        
-        if (response.data && response.data.data && response.data.data.children) {
-          console.log(`Got ${response.data.data.children.length} results from r/${subreddit}`);
-          allPosts.push(...response.data.data.children);
-        }
-      } catch (subError) {
-        console.log(`Error searching r/${subreddit}:`, subError.message);
-      }
-    }
+    // Fetch data from Reddit's non-API JSON endpoint
+    const response = await axios.get(`${REDDIT_SEARCH_URL}?${searchParams.toString()}`, {
+      headers: {
+        // Use a more realistic user agent that's less likely to be blocked
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.82 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Cache-Control': 'max-age=0'
+      },
+      timeout: 8000 // Increase timeout to 8 seconds
+    });
     
-    // Process the posts
-    if (allPosts.length > 0) {
-      console.log(`Total posts found from Reddit: ${allPosts.length}`);
-      const processedPosts = processRedditPosts(allPosts);
-      console.log(`After processing: ${processedPosts.length} posts`);
-      
-      // Store in cache (even if empty)
-      cache.set('redditComments', processedPosts);
-      
-      // Return the posts (or empty array)
+    // Check if we got a valid response
+    if (!response.data || !response.data.data || !response.data.data.children) {
+      console.log("Invalid response structure:", JSON.stringify(response.data).substring(0, 200));
       return {
         statusCode: 200,
         headers: {
           'Content-Type': 'application/json',
-          'Cache-Control': 'max-age=3600',
           'Access-Control-Allow-Origin': '*'
         },
-        body: JSON.stringify(processedPosts)
+        body: JSON.stringify([])
       };
     }
     
-    // If we got here, no posts were found
-    console.log("No relevant posts found");
-    cache.set('redditComments', []);
+    // Process posts
+    const allPosts = response.data.data.children;
+    console.log(`Retrieved ${allPosts.length} posts from Reddit`);
     
+    // Filter and process posts
+    const processedPosts = processRedditPosts(allPosts);
+    console.log(`After processing: ${processedPosts.length} posts`);
+    
+    // Store in cache (even if empty)
+    cache.set('redditComments', processedPosts);
+    
+    // Return the posts
     return {
       statusCode: 200,
       headers: {
@@ -100,13 +81,19 @@ exports.handler = async function(event, context) {
         'Cache-Control': 'max-age=3600',
         'Access-Control-Allow-Origin': '*'
       },
-      body: JSON.stringify([])
+      body: JSON.stringify(processedPosts)
     };
   } catch (error) {
-    console.error('Error in Reddit function:', error);
+    console.error('Error in Reddit function:', error.message);
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response headers:', JSON.stringify(error.response.headers));
+      console.error('Response data:', JSON.stringify(error.response.data).substring(0, 500));
+    }
     
+    // Return empty array
     return {
-      statusCode: 200, // Still return 200 with empty array
+      statusCode: 200,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
@@ -130,12 +117,22 @@ function processRedditPosts(posts) {
       const title = (postData.title || '').toLowerCase();
       const selftext = (postData.selftext || '').toLowerCase();
       
-      // Check if both Vercel and Netlify are mentioned
+      // Check if both Vercel AND Netlify are mentioned
       if ((title.includes('vercel') || selftext.includes('vercel')) && 
           (title.includes('netlify') || selftext.includes('netlify'))) {
         
         // Skip if we already have a post from this author
         if (seenAuthors.has(postData.author)) continue;
+        
+        // Skip posts that aren't actually talking about both (additional filter)
+        if (title.includes('ups') && !title.includes('vercel') && !title.includes('netlify')) {
+          continue;
+        }
+        
+        // Skip posts with very little engagement
+        if (postData.score < 0 && postData.num_comments < 2) {
+          continue;
+        }
         
         // Add author to seen set
         seenAuthors.add(postData.author);

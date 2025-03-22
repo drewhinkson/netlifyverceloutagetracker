@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Community Discussions - Vercel vs Netlify Status Tracker</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <!-- Standalone Reddit script - no dependencies on script.js -->
+    <script src="reddit-standalone.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <nav class="bg-gradient-to-r from-black to-teal-600 text-white p-4 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold">Vercel vs Netlify Status Tracker</h1>
+            <div class="flex items-center space-x-4">
+                <span id="reddit-last-updated" class="text-sm opacity-80">Last updated: Never</span>
+                <button id="refresh-reddit-btn" class="bg-white text-gray-800 px-3 py-1 rounded-md text-sm font-medium hover:bg-gray-200 transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Refresh
+                </button>
+                <a href="index.html" class="bg-white text-gray-800 px-3 py-1 rounded-md text-sm font-medium hover:bg-gray-200 transition">
+                    Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto py-6 px-4">
+        <section class="mb-8">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Community Discussions</h2>
+                <div class="text-sm text-gray-600">
+                    <p>Showing discussions mentioning both Vercel and Netlify</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold mb-2">Recent Reddit Discussions</h3>
+            
+                </div>
+                
+                <!-- Reddit comments container -->
+                <div id="reddit-comments-container" class="mt-4">
+                    <div class="flex justify-center items-center h-48">
+                        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        
+    </main>
+
+    
+
+</body>
+</html>

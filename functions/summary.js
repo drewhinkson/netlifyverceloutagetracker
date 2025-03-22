@@ -18,7 +18,7 @@ exports.handler = async function(event, context) {
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'max-age=300',
-          'Access-Control-Allow-Origin': '*' // For CORS - adjust as needed
+          'Access-Control-Allow-Origin': '*' 
         },
         body: JSON.stringify(cachedData)
       };

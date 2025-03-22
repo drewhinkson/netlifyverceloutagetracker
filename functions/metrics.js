@@ -20,9 +20,7 @@ exports.handler = async function(event, context) {
       };
     }
 
-    // We're not actually fetching real metrics here, as both providers don't expose this directly.
-    // In a real app, you might calculate metrics from the incidents history or 
-    // use other data sources. Here we're just providing placeholder data.
+  
     
     const data = {
       lastUpdated: new Date().toISOString(),

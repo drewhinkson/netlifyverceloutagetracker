@@ -1,5 +1,9 @@
-// Completely independent Reddit functionality - doesn't rely on script.js at all
-const API_PATH = '/api/reddit';
+
+const API_PATHS = [
+    '/api/reddit',
+    '/.netlify/functions/reddit',
+    '/reddit'
+];
 
 // When the page loads
 document.addEventListener('DOMContentLoaded', function() {
@@ -14,15 +18,30 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Load Reddit data
-function loadRedditData() {
+async function loadRedditData() {
     showLoading();
-    fetchRedditPosts();
+    let succeeded = false;
+    
+    // Try each API path until one works
+    for (const path of API_PATHS) {
+        try {
+            console.log(`Attempting to fetch from: ${path}`);
+            succeeded = await tryFetchRedditPosts(path);
+            if (succeeded) break;
+        } catch (error) {
+            console.error(`Failed with path ${path}:`, error);
+        }
+    }
+    
+    if (!succeeded) {
+        console.error("All API paths failed");
+        showEmpty();
+    }
 }
 
 // Refresh data (with error handling)
 function refreshRedditData() {
-    showLoading();
-    fetchRedditPosts(true);
+    loadRedditData();
 }
 
 // Show loading spinner
@@ -34,53 +53,80 @@ function showLoading() {
     `;
 }
 
-// Fetch posts from Reddit API
-async function fetchRedditPosts(showErrors = false) {
+// Try a specific API path
+async function tryFetchRedditPosts(apiPath) {
     try {
-        const response = await fetch(API_PATH);
+        console.log(`Fetching from ${apiPath}...`);
+        const response = await fetch(apiPath);
+        
+        if (!response.ok) {
+            console.error(`Response not OK: ${response.status}`);
+            return false;
+        }
+        
         const data = await response.json();
+        console.log(`Got data from ${apiPath}, items:`, data ? data.length : 0);
         
         // Apply extremely strict filtering
         const processedPosts = strictlyFilterPosts(data);
+        console.log(`After filtering: ${processedPosts.length} posts`);
         
         if (processedPosts.length > 0) {
             displayPosts(processedPosts);
             updateLastUpdated();
-        } else {
-            showEmpty();
+            return true;
         }
+        
+        return false;
     } catch (error) {
-        console.error('Error fetching Reddit data:', error);
-        if (showErrors) {
-            showError();
-        } else {
-            showEmpty();
-        }
+        console.error(`Error with ${apiPath}:`, error);
+        return false;
     }
 }
 
 // Extremely strict filtering to only include posts that definitely mention both platforms
 function strictlyFilterPosts(posts) {
-    if (!Array.isArray(posts)) return [];
+    console.log("Filtering posts...");
+    
+    if (!Array.isArray(posts)) {
+        console.error("Posts is not an array:", typeof posts);
+        return [];
+    }
     
     const result = [];
     const seenAuthors = new Set();
     
     for (const post of posts) {
         // Skip if missing data
-        if (!post || !post.title) continue;
+        if (!post || !post.title) {
+            console.log("Skipping post with missing data");
+            continue;
+        }
         
         // Get text content
         const title = (post.title || '').toLowerCase();
         const snippet = (post.snippet || '').toLowerCase();
         
+        // Log for debugging
+        console.log(`Checking post: "${title.substring(0, 40)}..."`);
+        console.log(`Vercel in title: ${title.includes('vercel')}`);
+        console.log(`Netlify in title: ${title.includes('netlify')}`);
+        console.log(`Vercel in snippet: ${snippet.includes('vercel')}`);
+        console.log(`Netlify in snippet: ${snippet.includes('netlify')}`);
+        
         // SUPER STRICT: Ensure both Vercel AND Netlify are mentioned
         if (!containsBothTerms(title, snippet)) {
+            console.log("Skipping - doesn't mention both platforms");
             continue;
         }
         
+        console.log("Post accepted - mentions both platforms");
+        
         // Skip if we already have a post from this author
-        if (seenAuthors.has(post.author)) continue;
+        if (seenAuthors.has(post.author)) {
+            console.log(`Skipping duplicate author: ${post.author}`);
+            continue;
+        }
         
         // Add author to seen set
         seenAuthors.add(post.author);

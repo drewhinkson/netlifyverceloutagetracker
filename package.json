@@ -1,0 +1,19 @@
+{
+    "name": "vercel-netlify-status-tracker",
+    "version": "1.0.0",
+    "description": "Status dashboard comparing Vercel and Netlify",
+    "main": "index.js",
+    "scripts": {
+        "dev": "netlify dev",
+        "build": "netlify build"
+    },
+    "dependencies": {
+        "axios": "^1.6.0",
+        "node-cache": "^5.1.2"
+    },
+    "devDependencies": {
+        "netlify-cli": "^17.0.0"
+    },
+    "author": "",
+    "license": "ISC"
+}
